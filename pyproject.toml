@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "plexoptimize"
+version = "0.1.0"
+description = "Scan messy drives, fix misnamed/broken media, remove duplicates, and rebuild a clean Plex library."
+requires-python = ">=3.9"
+dependencies = ["guessit>=3.7"]
+
+[project.scripts]
+plexopt = "plexoptimize.cli:main"
+
+[tool.setuptools]
+packages = ["plexoptimize"]

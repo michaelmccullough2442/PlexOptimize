@@ -1,0 +1,6 @@
+library.db
+*.csv
+plexoptimize-journal.jsonl*
+__pycache__/
+*.egg-info/
+.venv/
