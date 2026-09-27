@@ -125,10 +125,16 @@ Check `_PlexOptimize\Broken\` yourself and delete it once you're sure. Those fil
 
 ```powershell
 $env:PLEX_TOKEN = "your-token"
-plexopt plex-setup --movies "D:\Plex\Movies" --tv "D:\Plex\TV Shows" --home-videos "D:\Home Videos"
+plexopt plex-setup --movies "D:\Plex\Movies" --tv "D:\Plex\TV Shows" --home-videos "D:\Home Videos" --music "D:\Music"
 ```
 
 The `--home-videos` library is optional. It is a place to watch your own videos in Plex without Plex trying to match them to movies.
+
+The `--music` library is optional too, and it's what **Plexamp** plays. You can give it several folders (`--music "D:\Music" "E:\iTunes"`). Plex matches music by the tags inside the files, so if artists or albums come out wrong, fix the tags with the free **MusicBrainz Picard** and rescan.
+
+`plex-setup` skips libraries that already exist, so you can run it again later just to add one, e.g. `plexopt plex-setup --music "D:\Music"`.
+
+`plexopt plex-tune` shows which of the settings below differ from what's recommended; `plexopt plex-tune --execute` applies them. It only touches settings your Plex version has.
 
 Recommended settings (Plex Web > Settings):
 
@@ -158,7 +164,71 @@ plexopt plex-check
 
 Once `plex-check` says `Remote access is WORKING`, you're done. Test it from your phone over mobile data with Wi-Fi off.
 
-## 10. Keeping it clean
+## 10. Check that Plex indexed everything correctly
+
+Wait until the first scan is done (the spinning icon in Plex Web stops), then:
+
+```powershell
+plexopt plex-index --csv plex-problems.csv
+```
+
+For every library it reports:
+
+- whether Plex is still scanning, and any library folder it can't reach (an unplugged or renamed drive)
+- whether *Scan my library automatically* is on
+- for each movie and show: **verified** (Plex's match agrees with the `{tmdb-ID}` in the name), **matched WRONG** (Plex picked a different title), **unmatched** (Plex gave up), or **not verifiable** (no `{tmdb-ID}` in the name, e.g. files you added by hand)
+
+Home Videos and other personal libraries are only counted, never checked or changed.
+
+To fix wrong and unmatched items, have Plex re-read the `{tmdb-ID}` tag:
+
+```powershell
+plexopt plex-index --rematch            # dry run: lists what it would re-match
+plexopt plex-index --rematch --execute
+```
+
+If something is still wrong after that, open it in Plex Web, click **...** > **Fix Match**, and search for `tmdb-603` (with your ID).
+
+## 11. Make Plex more useful
+
+### Built in with Plex Pass (turned on by `plex-tune`)
+
+- **Skip Intro / Skip Credits** buttons, detected overnight.
+- **Loudness levelling**, so quiet dialogue and loud explosions even out.
+- **Sonic analysis for Plexamp.** Plex listens to every track overnight. That powers Plexamp's song, artist and album radios, *Sonic Adventure* (a playlist that drifts from one song to another), and daily mixes. It takes a few nights to get through a big collection.
+- **Hardware transcoding**, so remote streams and phones play smoothly.
+- **Subtitles:** in any player, choose *Subtitles > Search* to download one from OpenSubtitles. No plugin needed.
+- **Downloads:** in the Plex mobile app, download movies to your phone for flights.
+
+Plex removed its old "channel" plugins in 2018. Today, useful add-ons are separate apps that talk to Plex. `plexopt` sets these four up for you:
+
+| app | what you get |
+|---|---|
+| **Tautulli** | A dashboard at http://localhost:8181 showing who's watching what, play history and stats, plus alerts (email, Discord, phone) when someone starts watching, a stream buffers, or the server goes offline. |
+| **Kometa** | Automatic collections in Plex: franchises (every *Marvel*, *Star Wars*, *Harry Potter* film grouped together), IMDb Top 250, Trending, Newly Added, genres, decades and seasonal collections (Halloween, Christmas), and TV networks. Optionally it badges posters with 4K/HDR/Atmos. It only changes Plex's metadata, never your files, and it runs nightly. |
+| **Plex Auto Languages** | Switch a show's audio or subtitle track once (say, Japanese audio with English subtitles) and every other episode of that show switches too. No setup. |
+| **PlexTraktSync** | Backs up your watch history and ratings to a free Trakt.tv account and updates it live as you watch. If you ever rebuild Plex again, nothing is lost. Needs a one-time login (step 5 of the README it writes). |
+
+```powershell
+winget install Docker.DockerDesktop     # then start Docker Desktop once
+plexopt plex-companions --tz "Pacific/Honolulu"     # your time zone
+cd ~\PlexCompanions
+docker compose up -d
+docker compose run --rm kometa --run    # build the collections now instead of tonight
+```
+
+`plex-companions` writes its files to `~\PlexCompanions`, outside this repo, because they contain your Plex token and TMDB key (in `.env` and `kometa\config.yml`). It never gives Kometa your Home Videos library. Add `--overlays` to get the poster badges. Then open http://localhost:8181 and follow Tautulli's wizard, using Plex host `host.docker.internal` and port `32400`. `~\PlexCompanions\README.txt` has the details, including the Trakt login.
+
+### On your phone
+
+- **Plexamp** (free app; the best features need Plex Pass): music, with downloads for offline listening.
+- **Plex Dash** (free with Plex Pass): a remote for the server. See who's watching, start a scan, and check the server's health.
+- **Tautulli alerts:** in Tautulli, go to **Settings > Notification Agents** to get a push or Discord message when someone starts watching or the server goes offline.
+- **Downloads** in the Plex app save movies and shows to your phone for offline viewing.
+
+**Optional, later:** *Overseerr* adds a "request a movie" page for people you share with, and *Tdarr* converts old AVI/WMV files to MP4 so they stop transcoding. Add them once the basics have been working for a while.
+
+## 12. Keeping it clean
 
 When you add new downloads, run the same pipeline on just that folder:
 
@@ -168,4 +238,5 @@ plexopt identify
 plexopt plan --movies "D:\Plex\Movies" --tv "D:\Plex\TV Shows"
 plexopt apply plan.csv --execute
 plexopt plex-refresh
+plexopt plex-index
 ```

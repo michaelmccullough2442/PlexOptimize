@@ -60,17 +60,37 @@ def main(argv=None):
     for name, text in [("plex-check", "check Plex server, Plex Pass, and remote access"),
                        ("plex-setup", "create Movies / TV / Home Videos libraries"),
                        ("plex-remote", "turn remote access on and pin the port"),
-                       ("plex-refresh", "rescan all libraries and clean up old metadata")]:
+                       ("plex-refresh", "rescan all libraries and clean up old metadata"),
+                       ("plex-index", "check every library is indexed and matched to the right title"),
+                       ("plex-tune", "apply recommended scan/transcode/Plex Pass settings (dry run unless --execute)"),
+                       ("plex-companions", "generate Tautulli + Kometa (auto collections) setup")]:
         s = sub.add_parser(name, help=text)
         s.add_argument("--url", default=os.environ.get("PLEX_URL", "http://127.0.0.1:32400"))
         s.add_argument("--token", default=os.environ.get("PLEX_TOKEN"))
         if name == "plex-setup":
-            s.add_argument("--movies", required=True)
-            s.add_argument("--tv", required=True)
+            s.add_argument("--movies")
+            s.add_argument("--tv")
             s.add_argument("--home-videos", help="optional folder for your own videos")
+            s.add_argument("--music", nargs="*", default=[],
+                           help="optional music folder(s) -> Music library for Plexamp")
         if name == "plex-remote":
             s.add_argument("--enable", action="store_true")
             s.add_argument("--port", type=int, default=32400)
+        if name == "plex-index":
+            s.add_argument("--csv", help="also write the problem items to this CSV")
+            s.add_argument("--rematch", action="store_true",
+                           help="re-match wrong/unmatched items from their {tmdb-ID} tag")
+            s.add_argument("--execute", action="store_true")
+        if name == "plex-tune":
+            s.add_argument("--execute", action="store_true")
+        if name == "plex-companions":
+            s.add_argument("--out", default=str(Path.home() / "PlexCompanions"),
+                           help="where to write docker-compose.yml etc. (default: ~/PlexCompanions)")
+            s.add_argument("--tmdb-key", default=os.environ.get("TMDB_API_KEY"))
+            s.add_argument("--tz", default=os.environ.get("TZ", "Etc/UTC"),
+                           help="your time zone, e.g. America/Chicago")
+            s.add_argument("--overlays", action="store_true", help="badge posters with 4K/HDR/audio")
+            s.add_argument("--force", action="store_true", help="overwrite an existing config")
 
     a = ap.parse_args(argv)
     inv = Inventory(a.db)
@@ -142,11 +162,18 @@ def main(argv=None):
         if a.cmd == "plex-check":
             check(p)
         elif a.cmd == "plex-setup":
-            p.create_section("Movies", "movie", [a.movies])
-            p.create_section("TV Shows", "show", [a.tv])
-            if a.home_videos:
-                p.create_section("Home Videos", "homevideo", [a.home_videos])
-            print("Libraries created; Plex is scanning them now.")
+            existing = {sec["title"] for sec in p.sections()}
+            for title, kind, locs in [("Movies", "movie", [a.movies] if a.movies else []),
+                                      ("TV Shows", "show", [a.tv] if a.tv else []),
+                                      ("Home Videos", "homevideo", [a.home_videos] if a.home_videos else []),
+                                      ("Music", "music", a.music)]:
+                if not locs:
+                    continue
+                if title in existing:
+                    print(f"[keep] {title} library already exists")
+                else:
+                    p.create_section(title, kind, locs)
+                    print(f"[new] {title}: {', '.join(locs)} - Plex is scanning it now")
         elif a.cmd == "plex-remote":
             if a.enable:
                 p.set_pref(ManualPortMappingMode=1, ManualPortMappingPort=a.port)
@@ -157,6 +184,34 @@ def main(argv=None):
             p.refresh()
             p.cleanup()
             print("Rescan started; emptied trash, cleaned bundles, optimized database.")
+        elif a.cmd == "plex-index":
+            from .plex import index_report, rematch
+            if not a.token:
+                sys.exit("Need --token or PLEX_TOKEN")
+            problems = index_report(p)
+            if a.csv:
+                import csv
+                with open(a.csv, "w", newline="", encoding="utf-8-sig") as f:
+                    w = csv.DictWriter(f, fieldnames=["library", "status", "title", "year", "note",
+                                                      "path", "rating_key"])
+                    w.writeheader()
+                    w.writerows(problems)
+                print(f"Wrote {a.csv}")
+            if a.rematch:
+                print()
+                rematch(p, problems, execute=a.execute)
+        elif a.cmd == "plex-tune":
+            from .plex import tune
+            if not a.token:
+                sys.exit("Need --token or PLEX_TOKEN")
+            tune(p, execute=a.execute)
+        elif a.cmd == "plex-companions":
+            from . import companions
+            if not (a.token and a.tmdb_key):
+                sys.exit("Need your Plex token (PLEX_TOKEN) and TMDB key (TMDB_API_KEY)")
+            companions.write(a.out, p.sections(), a.token, a.tmdb_key, tz=a.tz,
+                             overlays=a.overlays, force=a.force)
+            print(f"\nNext: read {Path(a.out, 'README.txt')} (install Docker, then `docker compose up -d`)")
 
 
 def _report(inv, full=False):

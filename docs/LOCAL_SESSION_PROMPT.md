@@ -34,7 +34,7 @@ Work through this in order. Check in with me at each **STOP**.
 
    **STOP** before each destructive step.
 
-9. **New Plex server.** Help me claim the fresh server. Run `plexopt plex-setup` (ask whether I want a Home Videos library for my own videos). Apply the recommended settings from the guide, including hardware transcoding.
+9. **New Plex server.** Help me claim the fresh server. Run `plexopt plex-setup` (ask whether I want a Home Videos library for my own videos). I want a Music library for Plexamp, so find where my music is and pass it with `--music`. Apply the recommended settings from the guide, including hardware transcoding.
 
 10. **Remote access.** Run `plexopt plex-remote --enable` and `plexopt plex-check`. If it isn't working, diagnose it on this PC:
     - my local IP and gateway
@@ -44,7 +44,9 @@ Work through this in order. Check in with me at each **STOP**.
 
     Give me exact router steps for the router brand you detect. Keep going until `plex-check` says remote access is WORKING. Then have me test from my phone on mobile data.
 
-11. **Finish up.** Run `plexopt plex-refresh`. After I confirm the library looks right, show me what `plexopt purge` would free. Only run it with `--execute` when I say so. Commit any code fixes you made to the branch and push.
+11. **Plex indexing and extras.** Run `plexopt plex-tune` and show me the dry run; apply with `--execute` after I say yes. Once Plex has finished its first scan, run `plexopt plex-index --csv plex-problems.csv` and summarize it. For wrong or unmatched items, show me `plexopt plex-index --rematch`, run it with `--execute` after I say yes, then run `plex-index` again. Walk me through anything that's still wrong in Plex Web (Fix Match). Then set up the companion apps from guide section 11: Tautulli, Kometa, Plex Auto Languages and PlexTraktSync. I've already said yes to them and to installing Docker Desktop. My time zone is Hawaii, so run `plexopt plex-companions --tz Pacific/Honolulu`, start them, and run Kometa once. Then help me through Tautulli's setup wizard and the one-time Trakt login (the README it writes, step 5).
+
+12. **Finish up.** Run `plexopt plex-refresh`. After I confirm the library looks right, show me what `plexopt purge` would free. Only run it with `--execute` when I say so. Commit any code fixes you made to the branch and push.
 
 Ground rules:
 - Never permanently delete anything without my explicit OK for that specific step.
