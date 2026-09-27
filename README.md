@@ -50,7 +50,8 @@ Read **[docs/REBUILD_GUIDE.md](docs/REBUILD_GUIDE.md)** for the full walkthrough
 | `plex-check` / `plex-setup` / `plex-remote` / `plex-refresh` | manage the Plex server |
 | `plex-index [--csv F] [--rematch --execute]` | is every library indexed, and is each title matched to the right movie/show? |
 | `plex-tune [--execute]` | apply recommended auto-scan, transcoding and Plex Pass settings |
-| `plex-companions` | generate Tautulli (stats) + Kometa (automatic collections) setup |
+| `plex-setup ... [--music DIRS]` | also adds a Music library for Plexamp; safe to re-run |
+| `plex-companions` | generate Tautulli (stats), Kometa (collections), Plex Auto Languages and PlexTraktSync (watch-history backup) |
 
 ## Tests
 

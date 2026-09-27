@@ -68,9 +68,11 @@ def main(argv=None):
         s.add_argument("--url", default=os.environ.get("PLEX_URL", "http://127.0.0.1:32400"))
         s.add_argument("--token", default=os.environ.get("PLEX_TOKEN"))
         if name == "plex-setup":
-            s.add_argument("--movies", required=True)
-            s.add_argument("--tv", required=True)
+            s.add_argument("--movies")
+            s.add_argument("--tv")
             s.add_argument("--home-videos", help="optional folder for your own videos")
+            s.add_argument("--music", nargs="*", default=[],
+                           help="optional music folder(s) -> Music library for Plexamp")
         if name == "plex-remote":
             s.add_argument("--enable", action="store_true")
             s.add_argument("--port", type=int, default=32400)
@@ -160,11 +162,18 @@ def main(argv=None):
         if a.cmd == "plex-check":
             check(p)
         elif a.cmd == "plex-setup":
-            p.create_section("Movies", "movie", [a.movies])
-            p.create_section("TV Shows", "show", [a.tv])
-            if a.home_videos:
-                p.create_section("Home Videos", "homevideo", [a.home_videos])
-            print("Libraries created; Plex is scanning them now.")
+            existing = {sec["title"] for sec in p.sections()}
+            for title, kind, locs in [("Movies", "movie", [a.movies] if a.movies else []),
+                                      ("TV Shows", "show", [a.tv] if a.tv else []),
+                                      ("Home Videos", "homevideo", [a.home_videos] if a.home_videos else []),
+                                      ("Music", "music", a.music)]:
+                if not locs:
+                    continue
+                if title in existing:
+                    print(f"[keep] {title} library already exists")
+                else:
+                    p.create_section(title, kind, locs)
+                    print(f"[new] {title}: {', '.join(locs)} - Plex is scanning it now")
         elif a.cmd == "plex-remote":
             if a.enable:
                 p.set_pref(ManualPortMappingMode=1, ManualPortMappingPort=a.port)

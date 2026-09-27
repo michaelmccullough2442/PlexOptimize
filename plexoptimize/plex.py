@@ -34,9 +34,11 @@ class Plex:
     def account(self):
         return self._req("/myplex/account").get("MyPlex", {})
 
+    def settings(self):
+        return self._req("/:/prefs").get("MediaContainer", {}).get("Setting", [])
+
     def prefs(self):
-        items = self._req("/:/prefs").get("MediaContainer", {}).get("Setting", [])
-        return {s["id"]: s.get("value") for s in items}
+        return {s["id"]: s.get("value") for s in self.settings()}
 
     def set_pref(self, **kv):
         self._req("/:/prefs", method="PUT", **kv)
@@ -50,8 +52,10 @@ class Plex:
             "show": ("tv.plex.agents.series", "Plex TV Series"),
             "homevideo": ("com.plexapp.agents.none", "Plex Video Files Scanner"),
             "photo": ("com.plexapp.agents.none", "Plex Photo Scanner"),
+            "music": ("tv.plex.agents.music", "Plex Music"),
         }[kind]
-        params = [("name", name), ("type", "movie" if kind == "homevideo" else kind),
+        ptype = {"homevideo": "movie", "music": "artist"}.get(kind, kind)
+        params = [("name", name), ("type", ptype),
                   ("agent", agent), ("scanner", scanner), ("language", "en-US")]
         params += [("location", loc) for loc in locations]
         if self.token:
@@ -225,7 +229,8 @@ def index_report(plex, log=print):
             log(f"  [!] Uses the old '{agent}' agent. Edit the library > Advanced and switch to the new "
                 "Plex Movie / Plex TV Series agent for reliable {tmdb-ID} matching.")
         if kind not in ("movie", "show") or agent == "com.plexapp.agents.none":
-            log(f"  [i] {plex.count(sec['key'])} items (personal/other library - not checked against TMDB)")
+            what = "artists" if kind == "artist" else "items"
+            log(f"  [i] {plex.count(sec['key'])} {what} (only movie/TV matches can be verified against TMDB)")
             continue
 
         counts = {"ok": 0, "unmatched": 0, "mismatch": 0, "untagged": 0}
@@ -290,12 +295,43 @@ def _norm(v):
     return str(v)
 
 
+def _options(setting):
+    """Allowed values of an enum pref ('never:never|scheduled:as a scheduled task|...'), or None."""
+    ev = setting.get("enumValues")
+    return [o.split(":", 1)[0] for o in ev.split("|")] if ev else None
+
+
+def _sonic(settings):
+    """Plexamp's sonic analysis setting. Found by its label, since its id has changed across versions."""
+    for st in settings:
+        if "sonic" in f"{st.get('id', '')} {st.get('label', '')}".lower():
+            opts = _options(st)
+            if st.get("type") == "bool":
+                return st["id"], "1"
+            for want in ("scheduled", "asap", "1"):
+                if opts and want in opts:
+                    return st["id"], want
+    return None
+
+
 def tune(plex, execute=False, log=print):
-    prefs = plex.prefs()
+    settings = plex.settings()
+    prefs = {st["id"]: st.get("value") for st in settings}
+    by_id = {st["id"]: st for st in settings}
+    wanted = list(RECOMMENDED)
+    sonic = _sonic(settings)
+    if sonic:
+        wanted.append((*sonic, "Sonic analysis for Plexamp radios and mixes (Plex Pass), overnight"))
+    else:
+        log("  [skip] Sonic analysis (Plexamp): not found - turn it on in Settings > Library, "
+            "'Analyze audio tracks for sonic features'")
     changes = {}
-    for key, want, why in RECOMMENDED:
+    for key, want, why in wanted:
+        opts = _options(by_id.get(key, {}))
         if key not in prefs:
             log(f"  [skip] {why}: this Plex version has no '{key}' setting")
+        elif opts and want not in opts:
+            log(f"  [skip] {why}: '{want}' isn't an option here ({', '.join(opts)})")
         elif _norm(prefs[key]) == want:
             log(f"  [ok]   {why}")
         else:
