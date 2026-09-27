@@ -4,7 +4,7 @@ Python CLI (`plexopt`) that rebuilds the owner's Plex server from messy drives. 
 docs: README.md and docs/REBUILD_GUIDE.md.
 
 Owner's goals: fix obscure, mis-named and broken files from the old Plex server; delete large duplicates
-but NEVER their own photos/videos/recordings; consolidate music to one copy per song (`plexopt music`); working remote access (they have Plex Pass).
+but NEVER their own photos/videos/recordings; consolidate music to one copy per song (`plexopt music`); organize photos by date and remove identical/shrunken duplicate pictures (`plexopt photos`, owner explicitly asked for this - keeper copy always survives); working remote access (they have Plex Pass).
 
 When run locally on the owner's PC:
 - Everything destructive is a dry run until `--execute`; deletes stage in `<drive>/_PlexOptimize/ToDelete`

@@ -116,6 +116,39 @@ Songs with no artist/album tags come up as `review`. The easiest fix is to tag t
 
 Then, as with everything else, run `plexopt apply music.csv` to preview and add `--execute` to do it.
 
+## 6c. Organize photos and remove duplicate pictures
+
+```powershell
+plexopt photos --photos "D:\Pictures"
+```
+
+This writes `photos.csv`. Every photo from every scanned drive is placed by the date it was taken, into `Pictures\2019\2019-07\IMG_1234.jpg`. The date comes from the camera's own record (EXIF), the video's recorded date, or a date in the filename, like `IMG_20190704_...` or `IMG-20190704-WA0001`. Photos with no date go to `Pictures\Undated\<the folder they came from>\`.
+
+It removes:
+
+- **identical copies**, for example the same photo in three old phone backups. One copy is always kept;
+- **shrunken copies**: the same picture at a lower resolution, as WhatsApp, Facebook, email or "export" produce. The full-size original is kept.
+
+It keeps, even when they look alike:
+
+- burst shots;
+- edited, cropped or filtered versions;
+- RAW + JPEG pairs;
+- Live Photo stills with their video.
+
+It ignores:
+
+- movie posters and album art;
+- tiny icons and thumbnails.
+
+Pictures it can't open are listed as `review` for you to check. They are not moved.
+
+Your phone and camera videos are organized alongside the photos, and identical copies of them are removed too. Add `--no-videos` to leave the videos where they are.
+
+HEIC (iPhone) photos are supported. RAW files are dated from their filename or their JPEG twin.
+
+As always, run `plexopt apply photos.csv` to preview, then add `--execute`. Removed copies wait in `_PlexOptimize\ToDelete` until you purge. **Look through that folder before purging.** These are your memories.
+
 ## 7. Apply the changes
 
 ```powershell
@@ -143,10 +176,10 @@ Check `_PlexOptimize\Broken\` yourself and delete it once you're sure. Those fil
 
 ```powershell
 $env:PLEX_TOKEN = "your-token"
-plexopt plex-setup --movies "D:\Plex\Movies" --tv "D:\Plex\TV Shows" --music "D:\Plex\Music" --home-videos "D:\Home Videos"
+plexopt plex-setup --movies "D:\Plex\Movies" --tv "D:\Plex\TV Shows" --music "D:\Plex\Music" --photos "D:\Pictures"
 ```
 
-The `--home-videos` library is optional. It is a place to watch your own videos in Plex without Plex trying to match them to movies.
+Each of `--music`, `--photos` and `--home-videos` is optional. The Photos library shows your pictures and phone videos by date, including in the Plex app on your phone. If you organized videos with the photos, skip `--home-videos`. Otherwise `--home-videos` gives you a place to watch your own videos in Plex without Plex trying to match them to movies.
 
 Recommended settings (Plex Web > Settings):
 

@@ -301,7 +301,7 @@ def scan(inv, roots, exclude=(), deep=True, rescan=False, log=print):
             # A photo is personal unless it is obviously Plex artwork (poster/fanart).
             art = path.stem.lower() in {"poster", "fanart", "folder", "cover", "banner", "backdrop",
                                         "thumb", "landscape", "clearlogo", "logo"}
-            fields.update(personal=0 if art else 1,
+            fields.update(personal=0 if art else 1, probe=None,  # photos.py fills probe lazily
                           personal_note="artwork" if art else (pnote or "photo"), health="ok")
         else:
             fields.update(health="ok")

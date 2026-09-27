@@ -7,7 +7,7 @@ name = "plexoptimize"
 version = "0.1.0"
 description = "Scan messy drives, fix misnamed/broken media, remove duplicates, and rebuild a clean Plex library."
 requires-python = ">=3.9"
-dependencies = ["guessit>=3.7"]
+dependencies = ["guessit>=3.7", "pillow>=10", "pillow-heif>=0.16"]
 
 [project.scripts]
 plexopt = "plexoptimize.cli:main"

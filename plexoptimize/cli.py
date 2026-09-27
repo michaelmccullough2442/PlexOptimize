@@ -50,6 +50,12 @@ def main(argv=None):
                    help="keep the best-quality copy (lossless first) or the smallest file")
     s.add_argument("-o", "--out", default="music.csv")
 
+    s = sub.add_parser("photos", help="organize photos by date, remove duplicate pictures -> photos.csv")
+    s.add_argument("--photos", required=True, help=r"new Pictures folder, e.g. D:\Pictures")
+    s.add_argument("--no-videos", action="store_true",
+                   help="leave your phone/camera videos where they are (default: organize them with the photos)")
+    s.add_argument("-o", "--out", default="photos.csv")
+
     s = sub.add_parser("report", help="list broken, personal and unidentified files")
 
     s = sub.add_parser("apply", help="carry out a plan/dupes CSV (dry run unless --execute)")
@@ -75,6 +81,7 @@ def main(argv=None):
             s.add_argument("--tv", required=True)
             s.add_argument("--home-videos", help="optional folder for your own videos")
             s.add_argument("--music", help="optional Music folder")
+            s.add_argument("--photos", help="optional Photos folder")
         if name == "plex-remote":
             s.add_argument("--enable", action="store_true")
             s.add_argument("--port", type=int, default=32400)
@@ -138,6 +145,13 @@ def main(argv=None):
         print(f"Wrote {a.out}\n{planner.summary(rows)}")
         print("\nCheck it in Excel, then: plexopt apply", a.out, "(dry run) and add --execute to do it.")
 
+    elif a.cmd == "photos":
+        from . import photos
+        rows = photos.build(inv, a.photos, include_videos=not a.no_videos)
+        planner.write_csv(rows, a.out)
+        print(f"Wrote {a.out}\n{planner.summary(rows)}")
+        print("\nCheck it in Excel, then: plexopt apply", a.out, "(dry run) and add --execute to do it.")
+
     elif a.cmd == "report":
         _report(inv, full=True)
 
@@ -158,6 +172,8 @@ def main(argv=None):
         elif a.cmd == "plex-setup":
             p.create_section("Movies", "movie", [a.movies])
             p.create_section("TV Shows", "show", [a.tv])
+            if a.photos:
+                p.create_section("Photos", "photo", [a.photos])
             if a.music:
                 p.create_section("Music", "music", [a.music])
             if a.home_videos:
