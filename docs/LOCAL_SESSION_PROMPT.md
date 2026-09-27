@@ -44,7 +44,9 @@ Work through this in order. Check in with me at each **STOP**.
 
     Give me exact router steps for the router brand you detect. Keep going until `plex-check` says remote access is WORKING. Then have me test from my phone on mobile data.
 
-11. **Finish up.** Run `plexopt plex-refresh`. After I confirm the library looks right, show me what `plexopt purge` would free. Only run it with `--execute` when I say so. Commit any code fixes you made to the branch and push.
+11. **Plex indexing and extras.** Run `plexopt plex-tune` and show me the dry run; apply with `--execute` after I say yes. Once Plex has finished its first scan, run `plexopt plex-index --csv plex-problems.csv` and summarize it. For wrong or unmatched items, show me `plexopt plex-index --rematch`, run it with `--execute` after I say yes, then run `plex-index` again. Walk me through anything that's still wrong in Plex Web (Fix Match). Then ask whether I want Tautulli and Kometa (guide section 11). If I do, install Docker Desktop, run `plexopt plex-companions --tz <my time zone>`, start them, run Kometa once, and help me through Tautulli's setup wizard.
+
+12. **Finish up.** Run `plexopt plex-refresh`. After I confirm the library looks right, show me what `plexopt purge` would free. Only run it with `--execute` when I say so. Commit any code fixes you made to the branch and push.
 
 Ground rules:
 - Never permanently delete anything without my explicit OK for that specific step.

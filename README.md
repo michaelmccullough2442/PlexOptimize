@@ -27,6 +27,9 @@ $env:PLEX_TOKEN = "..."
 plexopt plex-setup --movies "D:\Plex\Movies" --tv "D:\Plex\TV Shows"
 plexopt plex-remote --enable
 plexopt plex-check
+plexopt plex-tune --execute
+plexopt plex-index            # after the first scan finishes
+plexopt plex-companions       # optional: Tautulli + Kometa
 ```
 
 Read **[docs/REBUILD_GUIDE.md](docs/REBUILD_GUIDE.md)** for the full walkthrough. It covers retiring the old server, settings, remote access troubleshooting and ongoing upkeep.
@@ -45,6 +48,9 @@ Read **[docs/REBUILD_GUIDE.md](docs/REBUILD_GUIDE.md)** for the full walkthrough
 | `undo` | reverse all applied changes |
 | `purge DRIVES... [--execute]` | permanently empty `_PlexOptimize\ToDelete` |
 | `plex-check` / `plex-setup` / `plex-remote` / `plex-refresh` | manage the Plex server |
+| `plex-index [--csv F] [--rematch --execute]` | is every library indexed, and is each title matched to the right movie/show? |
+| `plex-tune [--execute]` | apply recommended auto-scan, transcoding and Plex Pass settings |
+| `plex-companions` | generate Tautulli (stats) + Kometa (automatic collections) setup |
 
 ## Tests
 

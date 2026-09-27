@@ -5,9 +5,11 @@ https://support.plex.tv/articles/204059436-finding-an-authentication-token-x-ple
 """
 import ipaddress
 import json
+import re
 import urllib.error
 import urllib.parse
 import urllib.request
+from pathlib import Path
 
 
 class Plex:
@@ -56,6 +58,22 @@ class Plex:
             params.append(("X-Plex-Token", self.token))
         url = f"{self.url}/library/sections?{urllib.parse.urlencode(params)}"
         urllib.request.urlopen(urllib.request.Request(url, method="POST"), timeout=60).read()
+
+    def items(self, section_id):
+        return self._req(f"/library/sections/{section_id}/all", includeGuids=1) \
+            .get("MediaContainer", {}).get("Metadata", [])
+
+    def count(self, section_id):
+        mc = self._req(f"/library/sections/{section_id}/all", **{
+            "X-Plex-Container-Start": 0, "X-Plex-Container-Size": 0}).get("MediaContainer", {})
+        return mc.get("totalSize", mc.get("size", 0))
+
+    def metadata(self, rating_key):
+        md = self._req(f"/library/metadata/{rating_key}").get("MediaContainer", {}).get("Metadata", [])
+        return md[0] if md else {}
+
+    def activities(self):
+        return self._req("/activities").get("MediaContainer", {}).get("Activity", [])
 
     def refresh(self, section_id=None):
         if section_id:
@@ -126,3 +144,168 @@ def check(plex, log=print):
 
     secs = plex.sections()
     log(f"[i] Libraries: " + (", ".join(f"{s['title']} ({s['type']})" for s in secs) or "none yet"))
+
+
+# ---------------------------------------------------------------------------
+# Is Plex indexing correctly?
+
+TMDB_TAG = re.compile(r"\{tmdb-(\d+)\}")
+
+
+def _truthy(v):
+    return v in (True, "true", "1", 1)
+
+
+def _is_local(plex):
+    return urllib.parse.urlparse(plex.url).hostname in ("127.0.0.1", "localhost", "::1")
+
+
+def _item_path(plex, sec, item):
+    """The path that carries the {tmdb-ID} tag: the movie file, or the show folder."""
+    if sec["type"] == "movie":
+        for m in item.get("Media", []):
+            for p in m.get("Part", []):
+                if p.get("file"):
+                    return p["file"]
+        return ""
+    meta = plex.metadata(item["ratingKey"])
+    locs = meta.get("Location", [])
+    return locs[0].get("path", "") if locs else ""
+
+
+def classify(plex, sec, item):
+    """-> (status, path, note). status: ok | unmatched | mismatch | untagged."""
+    path = _item_path(plex, sec, item)
+    guid = item.get("guid", "")
+    tmdb_ids = [g["id"].split("://", 1)[1] for g in item.get("Guid", []) if g.get("id", "").startswith("tmdb://")]
+    tag = TMDB_TAG.findall(path)
+    want = tag[-1] if tag else None
+    if guid.startswith(("local://", "com.plexapp.agents.none")) or not guid:
+        return "unmatched", path, f"Plex couldn't match this (file says tmdb-{want})" if want else "no match"
+    if want and tmdb_ids and want not in tmdb_ids:
+        return "mismatch", path, f"file says tmdb-{want}, Plex matched tmdb-{tmdb_ids[0]}"
+    if not want:
+        return "untagged", path, "no {tmdb-ID} in the name, so the match can't be verified"
+    return "ok", path, ""
+
+
+def index_report(plex, log=print):
+    """Check every library: still scanning? folders reachable? items matched to the right title?
+
+    Returns a list of problem rows (dicts) for movie/show libraries.
+    """
+    problems = []
+    acts = plex.activities()
+    for a in acts:
+        log(f"[..] Plex is busy: {a.get('title')} {a.get('subtitle') or ''} ({int(a.get('progress') or 0)}%)")
+
+    prefs = plex.prefs()
+    if not _truthy(prefs.get("FSEventLibraryUpdatesEnabled")):
+        log("[!] 'Scan my library automatically' is OFF - new files won't show up on their own. "
+            "Fix: plexopt plex-tune")
+    if _truthy(prefs.get("autoEmptyTrash")):
+        log("[!] 'Empty trash automatically after every scan' is ON - an unplugged drive will wipe its "
+            "metadata. Fix: plexopt plex-tune")
+
+    secs = plex.sections()
+    if not secs:
+        log("[X] No libraries yet. Run: plexopt plex-setup --movies ... --tv ...")
+    for sec in secs:
+        name, kind = sec["title"], sec["type"]
+        state = "scanning now" if _truthy(sec.get("refreshing")) else "idle"
+        log(f"\n== {name} ({kind}, {state})")
+        for loc in sec.get("Location", []):
+            p = loc.get("path", "")
+            if _is_local(plex) and p and not Path(p).exists():
+                log(f"  [X] Folder not found: {p}  (drive unplugged or renamed? Plex will show items as unavailable)")
+            else:
+                log(f"  folder: {p}")
+        agent = sec.get("agent", "")
+        if kind in ("movie", "show") and agent.startswith("com.plexapp.agents.") and agent != "com.plexapp.agents.none":
+            log(f"  [!] Uses the old '{agent}' agent. Edit the library > Advanced and switch to the new "
+                "Plex Movie / Plex TV Series agent for reliable {tmdb-ID} matching.")
+        if kind not in ("movie", "show") or agent == "com.plexapp.agents.none":
+            log(f"  [i] {plex.count(sec['key'])} items (personal/other library - not checked against TMDB)")
+            continue
+
+        counts = {"ok": 0, "unmatched": 0, "mismatch": 0, "untagged": 0}
+        for item in plex.items(sec["key"]):
+            status, path, note = classify(plex, sec, item)
+            counts[status] += 1
+            if status != "ok":
+                problems.append({"library": name, "status": status, "title": item.get("title"),
+                                 "year": item.get("year") or "", "rating_key": item["ratingKey"],
+                                 "path": path, "note": note})
+        total = sum(counts.values())
+        log(f"  [{'ok' if counts['unmatched'] + counts['mismatch'] == 0 else '!'}] {total} items: "
+            f"{counts['ok']} verified, {counts['mismatch']} matched WRONG, {counts['unmatched']} unmatched, "
+            f"{counts['untagged']} not verifiable")
+        for r in problems:
+            if r["library"] == name and r["status"] in ("mismatch", "unmatched"):
+                log(f"    [{r['status']}] {r['title']} ({r['year']}) - {r['note']}\n        {r['path']}")
+    if any(r["status"] in ("mismatch", "unmatched") for r in problems):
+        log("\nTo re-match the flagged items from their {tmdb-ID} tag: plexopt plex-index --rematch --execute")
+    return problems
+
+
+def rematch(plex, problems, execute=False, log=print):
+    """Unmatch + refresh items so Plex re-reads the {tmdb-ID} tag. Dry run unless execute."""
+    todo = [r for r in problems if r["status"] in ("mismatch", "unmatched") and TMDB_TAG.search(r["path"])]
+    for r in todo:
+        log(f"{'rematch' if execute else 'would rematch'}: {r['title']} -> {TMDB_TAG.findall(r['path'])[-1]}")
+        if execute:
+            if r["status"] == "mismatch":
+                plex._req(f"/library/metadata/{r['rating_key']}/unmatch", method="PUT")
+            plex._req(f"/library/metadata/{r['rating_key']}/refresh", method="PUT", force=1)
+    if not todo:
+        log("Nothing to rematch.")
+    elif not execute:
+        log(f"\nDry run: {len(todo)} items. Add --execute to do it. Anything still wrong afterwards: "
+            "Plex Web > item > ... > Fix Match.")
+    return todo
+
+
+# ---------------------------------------------------------------------------
+# Recommended server settings. Only prefs this server actually has are touched.
+
+RECOMMENDED = [
+    ("FSEventLibraryUpdatesEnabled", "1", "Scan my library automatically"),
+    ("FSEventLibraryPartialScanEnabled", "1", "Run a partial scan when changes are detected"),
+    ("ScheduledLibraryUpdatesEnabled", "1", "Scan my library periodically (catches anything missed)"),
+    ("autoEmptyTrash", "0", "Don't empty trash after every scan (protects against an unplugged drive)"),
+    ("HardwareAcceleratedCodecs", "1", "Hardware transcoding (Plex Pass)"),
+    ("HardwareAcceleratedEncoders", "1", "Hardware-accelerated video encoding (Plex Pass)"),
+    ("GenerateIntroMarkerBehavior", "scheduled", "Skip Intro detection (Plex Pass), overnight"),
+    ("GenerateCreditsMarkerBehavior", "scheduled", "Skip Credits detection (Plex Pass), overnight"),
+    ("GenerateBIFBehavior", "scheduled", "Scrubbing preview thumbnails, overnight"),
+    ("LoudnessAnalysisBehavior", "scheduled", "Loudness levelling (Plex Pass), overnight"),
+]
+
+
+def _norm(v):
+    if v in (True, "true"):
+        return "1"
+    if v in (False, "false"):
+        return "0"
+    return str(v)
+
+
+def tune(plex, execute=False, log=print):
+    prefs = plex.prefs()
+    changes = {}
+    for key, want, why in RECOMMENDED:
+        if key not in prefs:
+            log(f"  [skip] {why}: this Plex version has no '{key}' setting")
+        elif _norm(prefs[key]) == want:
+            log(f"  [ok]   {why}")
+        else:
+            log(f"  [{'set' if execute else 'would set'}] {why}: {prefs[key]!r} -> {want!r}")
+            changes[key] = want
+    if changes and execute:
+        plex.set_pref(**changes)
+        log(f"Applied {len(changes)} settings.")
+    elif changes:
+        log(f"Dry run: {len(changes)} settings to change. Add --execute to apply.")
+    else:
+        log("All recommended settings already in place.")
+    return changes
