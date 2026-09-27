@@ -226,7 +226,11 @@ docker compose run --rm kometa --run    # build the collections now instead of t
 - **Tautulli alerts:** in Tautulli, go to **Settings > Notification Agents** to get a push or Discord message when someone starts watching or the server goes offline.
 - **Downloads** in the Plex app save movies and shows to your phone for offline viewing.
 
-**Optional, later:** *Overseerr* adds a "request a movie" page for people you share with, and *Tdarr* converts old AVI/WMV files to MP4 so they stop transcoding. Add them once the basics have been working for a while.
+You can add more apps later:
+- **Tdarr:** converts old AVI/WMV files to MP4, so they play on every device without live conversion.
+- **Overseerr:** lets people you share with request movies and shows (you approve or deny them).
+
+Add these with `plexopt plex-companions --tdarr --overseerr`, or skip them for now.
 
 ## 12. Keeping it clean
 

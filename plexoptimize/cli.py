@@ -90,6 +90,8 @@ def main(argv=None):
             s.add_argument("--tz", default=os.environ.get("TZ", "Etc/UTC"),
                            help="your time zone, e.g. America/Chicago")
             s.add_argument("--overlays", action="store_true", help="badge posters with 4K/HDR/audio")
+            s.add_argument("--tdarr", action="store_true", help="convert old AVI/WMV to MP4 overnight")
+            s.add_argument("--overseerr", action="store_true", help="let people request movies/shows")
             s.add_argument("--force", action="store_true", help="overwrite an existing config")
 
     a = ap.parse_args(argv)
@@ -210,7 +212,7 @@ def main(argv=None):
             if not (a.token and a.tmdb_key):
                 sys.exit("Need your Plex token (PLEX_TOKEN) and TMDB key (TMDB_API_KEY)")
             companions.write(a.out, p.sections(), a.token, a.tmdb_key, tz=a.tz,
-                             overlays=a.overlays, force=a.force)
+                             overlays=a.overlays, tdarr=a.tdarr, overseerr=a.overseerr, force=a.force)
             print(f"\nNext: read {Path(a.out, 'README.txt')} (install Docker, then `docker compose up -d`)")
 
 
