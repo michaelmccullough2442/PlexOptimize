@@ -48,8 +48,9 @@ class Plex:
             "show": ("tv.plex.agents.series", "Plex TV Series"),
             "homevideo": ("com.plexapp.agents.none", "Plex Video Files Scanner"),
             "photo": ("com.plexapp.agents.none", "Plex Photo Scanner"),
+            "music": ("tv.plex.agents.music", "Plex Music"),
         }[kind]
-        params = [("name", name), ("type", "movie" if kind == "homevideo" else kind),
+        params = [("name", name), ("type", {"homevideo": "movie", "music": "artist"}.get(kind, kind)),
                   ("agent", agent), ("scanner", scanner), ("language", "en-US")]
         params += [("location", loc) for loc in locations]
         if self.token:

@@ -16,6 +16,10 @@ VIDEO_EXT = {
     ".mkv", ".mp4", ".m4v", ".avi", ".mov", ".wmv", ".mpg", ".mpeg", ".ts", ".m2ts",
     ".mts", ".webm", ".flv", ".vob", ".divx", ".3gp", ".ogm", ".rmvb", ".asf",
 }
+AUDIO_EXT = {
+    ".mp3", ".flac", ".m4a", ".aac", ".ogg", ".oga", ".opus", ".wma", ".wav", ".aiff", ".aif",
+    ".alac", ".ape", ".wv", ".mka", ".dsf", ".dff",
+}
 SUB_EXT = {".srt", ".ass", ".ssa", ".sub", ".idx", ".vtt", ".sup", ".smi"}
 PHOTO_EXT = {
     ".jpg", ".jpeg", ".png", ".heic", ".heif", ".gif", ".bmp", ".tif", ".tiff", ".webp",
@@ -45,6 +49,16 @@ PERSONAL_TAGS = (
     "com.apple.quicktime.make", "com.apple.quicktime.model", "com.apple.quicktime.location.iso6709",
     "location", "location-eng", "com.android.version", "com.android.capture.fps", "make", "model",
 )
+# Voice memos, call and phone recordings, WhatsApp voice notes: your own audio.
+PERSONAL_AUDIO = re.compile(
+    r"^(voice|new recording|recording|rec[_ -]?\d|memo|aud-|ptt-|call[_ -]|audio_\d|\d{8}[_ -]\d{6})",
+    re.IGNORECASE,
+)
+PERSONAL_AUDIO_DIR = re.compile(
+    r"(^|[\\/])(voice memos?|recordings?|call recordings?|whatsapp audio|whatsapp voice notes|"
+    r"sound recordings?|voicemail)([\\/]|$)",
+    re.IGNORECASE,
+)
 
 
 def have_ffprobe():
@@ -55,6 +69,8 @@ def classify(path):
     ext = Path(path).suffix.lower()
     if ext in VIDEO_EXT:
         return "video"
+    if ext in AUDIO_EXT:
+        return "audio"
     if ext in SUB_EXT:
         return "subtitle"
     if ext in PHOTO_EXT:
@@ -130,6 +146,32 @@ def summarize(raw):
         "creation_time": tags.get("creation_time"),
         "encoder": tags.get("encoder"),
         "camera_tags": sorted(k for k in tags if k in PERSONAL_TAGS),
+        "audio": _audio_info(audio, tags) if audio else None,
+    }
+
+
+def _audio_info(audio, tags):
+    a = audio[0]
+
+    def num(x):
+        try:
+            return int(str(x).split("/")[0])
+        except (TypeError, ValueError):
+            return None
+
+    return {
+        "codec": a.get("codec_name"),
+        "bitrate": int(a["bit_rate"]) if str(a.get("bit_rate", "")).isdigit() else None,
+        "sample_rate": int(a["sample_rate"]) if str(a.get("sample_rate", "")).isdigit() else None,
+        "bits": a.get("bits_per_raw_sample") or a.get("bits_per_sample"),
+        "artist": tags.get("artist"),
+        "album_artist": tags.get("album_artist") or tags.get("albumartist") or tags.get("album artist"),
+        "album": tags.get("album"),
+        "title": tags.get("title"),
+        "track": num(tags.get("track")),
+        "disc": num(tags.get("disc")),
+        "year": (tags.get("date") or tags.get("year") or "")[:4] or None,
+        "genre": tags.get("genre"),
     }
 
 
@@ -178,6 +220,30 @@ def grade(size, info, err, decode_problems):
     return "ok", ""
 
 
+def grade_audio(size, info, err):
+    if size == 0:
+        return "broken", "file is empty (0 bytes)"
+    if info is None:
+        return "broken", err or "unreadable"
+    if not info.get("audio"):
+        return "broken", "no audio stream"
+    if not info["duration"] or info["duration"] < 1:
+        return "broken", "no duration (damaged or incomplete)"
+    if size < info["duration"] * 32_000 / 8 * 0.5:  # well under 32 kbit/s = truncated
+        return "broken", "file is far smaller than its length needs (truncated)"
+    return "ok", ""
+
+
+def looks_personal_audio(path):
+    p = Path(path)
+    reasons = []
+    if PERSONAL_AUDIO.match(p.name):
+        reasons.append("recording-style filename")
+    if PERSONAL_AUDIO_DIR.search(str(p.parent)):
+        reasons.append("in a recordings/voice memo folder")
+    return bool(reasons), "; ".join(reasons)
+
+
 def looks_personal(path, info=None):
     """True for media you shot yourself (phone, camera, GoPro, drone, screen recording)."""
     p = Path(path)
@@ -220,6 +286,16 @@ def scan(inv, roots, exclude=(), deep=True, rescan=False, log=print):
             probed += 1
             if health != "ok":
                 log(f"  [{health}] {path}  ({note})")
+        elif kind == "audio":
+            raw, err = ffprobe(path, timeout=30) if st.st_size else (None, None)
+            info = summarize(raw) if raw else None
+            health, note = grade_audio(st.st_size, info, err)
+            personal, pnote = looks_personal_audio(path)
+            fields.update(probe=info, health=health, health_note=note,
+                          personal=int(personal), personal_note=pnote)
+            probed += 1
+            if health != "ok":
+                log(f"  [{health}] {path}  ({note})")
         elif kind == "photo":
             personal, pnote = looks_personal(path)
             # A photo is personal unless it is obviously Plex artwork (poster/fanart).
@@ -232,11 +308,11 @@ def scan(inv, roots, exclude=(), deep=True, rescan=False, log=print):
         inv.upsert(path, **fields)
         if seen % 50 == 0:
             inv.commit()
-            log(f"  ...{seen} files seen, {probed} videos probed")
+            log(f"  ...{seen} files seen, {probed} videos/songs probed")
     # Drop rows for files that no longer exist under the scanned roots.
     root_prefixes = [str(Path(r).resolve()) for r in roots]
     for row in inv.all():
         if any(row["path"].startswith(r) for r in root_prefixes) and not os.path.exists(row["path"]):
             inv.delete(row["path"])
     inv.commit()
-    log(f"Scan done: {seen} media files seen, {probed} videos probed.")
+    log(f"Scan done: {seen} media files seen, {probed} videos/songs probed.")

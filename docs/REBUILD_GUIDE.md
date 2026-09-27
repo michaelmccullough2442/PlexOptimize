@@ -98,6 +98,24 @@ This finds byte-identical copies across **all** drives, for files of 500 MB and 
 
 **Your own photos and videos are never marked for deletion**, even when duplicated. They show up as `skip` with "PROTECTED" in the notes.
 
+## 6b. Consolidate music
+
+```powershell
+plexopt music --music "D:\Plex\Music"
+```
+
+This writes `music.csv`. Across all scanned drives it:
+
+- **deletes identical copies** of songs, whatever they're named;
+- **merges the same song in different files.** Same artist, album and title, within 3 seconds of the same length: an MP3 and a FLAC of one track, or a re-rip. It keeps the best copy: lossless first, then higher bitrate. Add `--keep smallest` to save space instead;
+- **moves the keepers** into `Music\Artist\Album (Year)\01 - Title.ext`.
+
+Live versions, remixes, and the same song on a different album (a "Greatest Hits", say) are **not** duplicates, so they stay. Voice memos and call recordings are recognized as yours and left alone.
+
+Songs with no artist/album tags come up as `review`. The easiest fix is to tag them with **MusicBrainz Picard** (free), then rescan that folder. Picard tags whole albums automatically from the audio. Otherwise leave them where they are.
+
+Then, as with everything else, run `plexopt apply music.csv` to preview and add `--execute` to do it.
+
 ## 7. Apply the changes
 
 ```powershell
@@ -125,7 +143,7 @@ Check `_PlexOptimize\Broken\` yourself and delete it once you're sure. Those fil
 
 ```powershell
 $env:PLEX_TOKEN = "your-token"
-plexopt plex-setup --movies "D:\Plex\Movies" --tv "D:\Plex\TV Shows" --home-videos "D:\Home Videos"
+plexopt plex-setup --movies "D:\Plex\Movies" --tv "D:\Plex\TV Shows" --music "D:\Plex\Music" --home-videos "D:\Home Videos"
 ```
 
 The `--home-videos` library is optional. It is a place to watch your own videos in Plex without Plex trying to match them to movies.

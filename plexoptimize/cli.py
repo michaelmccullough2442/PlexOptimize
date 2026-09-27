@@ -44,6 +44,12 @@ def main(argv=None):
     s.add_argument("--library", nargs="*", default=[], help="prefer keeping copies inside these folders")
     s.add_argument("-o", "--out", default="dupes.csv")
 
+    s = sub.add_parser("music", help="consolidate music: one copy per song in one folder -> music.csv")
+    s.add_argument("--music", required=True, help=r"new Music folder, e.g. D:\Plex\Music")
+    s.add_argument("--keep", choices=["best", "smallest"], default="best",
+                   help="keep the best-quality copy (lossless first) or the smallest file")
+    s.add_argument("-o", "--out", default="music.csv")
+
     s = sub.add_parser("report", help="list broken, personal and unidentified files")
 
     s = sub.add_parser("apply", help="carry out a plan/dupes CSV (dry run unless --execute)")
@@ -68,6 +74,7 @@ def main(argv=None):
             s.add_argument("--movies", required=True)
             s.add_argument("--tv", required=True)
             s.add_argument("--home-videos", help="optional folder for your own videos")
+            s.add_argument("--music", help="optional Music folder")
         if name == "plex-remote":
             s.add_argument("--enable", action="store_true")
             s.add_argument("--port", type=int, default=32400)
@@ -124,6 +131,13 @@ def main(argv=None):
         planner.write_csv(rows, a.out)
         print(f"{len(groups)} duplicate groups. Wrote {a.out}\n{planner.summary(rows)}")
 
+    elif a.cmd == "music":
+        from . import music
+        rows = music.build(inv, a.music, a.keep)
+        planner.write_csv(rows, a.out)
+        print(f"Wrote {a.out}\n{planner.summary(rows)}")
+        print("\nCheck it in Excel, then: plexopt apply", a.out, "(dry run) and add --execute to do it.")
+
     elif a.cmd == "report":
         _report(inv, full=True)
 
@@ -144,6 +158,8 @@ def main(argv=None):
         elif a.cmd == "plex-setup":
             p.create_section("Movies", "movie", [a.movies])
             p.create_section("TV Shows", "show", [a.tv])
+            if a.music:
+                p.create_section("Music", "music", [a.music])
             if a.home_videos:
                 p.create_section("Home Videos", "homevideo", [a.home_videos])
             print("Libraries created; Plex is scanning them now.")
@@ -165,8 +181,11 @@ def _report(inv, full=False):
     for r in vids:
         by.setdefault(r["health"], []).append(r)
     personal = [r for r in inv.all() if r["personal"]]
+    songs = inv.all("audio")
     print(f"\nVideos: {len(vids)}  ok: {len(by.get('ok', []))}  suspect: {len(by.get('suspect', []))}  "
-          f"broken: {len(by.get('broken', []))}   personal photos/videos (protected): {len(personal)}")
+          f"broken: {len(by.get('broken', []))}")
+    print(f"Songs: {len(songs)}  broken: {sum(r['health'] == 'broken' for r in songs)}   "
+          f"personal photos/videos/recordings (protected): {len(personal)}")
     if full:
         for h in ("broken", "suspect"):
             for r in by.get(h, []):
