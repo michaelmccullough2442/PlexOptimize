@@ -56,6 +56,15 @@ def main(argv=None):
                    help="leave your phone/camera videos where they are (default: organize them with the photos)")
     s.add_argument("-o", "--out", default="photos.csv")
 
+    s = sub.add_parser("audit", help="find media the scan may have missed (disc images, rips, archives...)")
+    s.add_argument("roots", nargs="+", help="the same drives you scanned")
+    s.add_argument("-o", "--out", default="audit.csv")
+
+    s = sub.add_parser("music-check", help="examine songs with no artist/album: real music or not?")
+    s.add_argument("--acoustid-key", default=os.environ.get("ACOUSTID_API_KEY"),
+                   help="free key from acoustid.org/new-application; identifies songs by their sound")
+    s.add_argument("-o", "--out", default="music-check.csv")
+
     s = sub.add_parser("report", help="list broken, personal and unidentified files")
 
     s = sub.add_parser("apply", help="carry out a plan/dupes CSV (dry run unless --execute)")
@@ -151,6 +160,14 @@ def main(argv=None):
         planner.write_csv(rows, a.out)
         print(f"Wrote {a.out}\n{planner.summary(rows)}")
         print("\nCheck it in Excel, then: plexopt apply", a.out, "(dry run) and add --execute to do it.")
+
+    elif a.cmd == "audit":
+        from . import audit
+        audit.run(inv, [str(Path(r).resolve()) for r in a.roots], a.out)
+
+    elif a.cmd == "music-check":
+        from . import music_check
+        music_check.run(inv, a.acoustid_key, a.out)
 
     elif a.cmd == "report":
         _report(inv, full=True)

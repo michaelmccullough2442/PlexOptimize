@@ -42,6 +42,8 @@ Read **[docs/REBUILD_GUIDE.md](docs/REBUILD_GUIDE.md)** for the full walkthrough
 | command | what it does |
 |---|---|
 | `scan DRIVES...` | inventory + health check + personal-media detection (resumable) |
+| `audit DRIVES...` | find media the scan may miss: disc images, DVD/Blu-ray rips, archives, unfinished downloads, wrong extensions -> `audit.csv` |
+| `music-check [--acoustid-key KEY]` | examine songs with no artist/album: real music, audiobook, recording or sound effect? -> `music-check.csv` |
 | `report` | list broken, suspect and unidentified files |
 | `identify` | match videos to TMDB |
 | `fix PATH --tmdb ID [--tv --season N --episode N]` | manually identify one file |

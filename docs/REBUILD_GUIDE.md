@@ -50,6 +50,26 @@ plexopt scan D:\ E:\ F:\
 
 `plexopt report` lists every broken or suspect file.
 
+## 3b. Make sure nothing was missed
+
+```powershell
+plexopt audit D:\ E:\ F:\
+```
+
+`scan` only picks up normal video, music and picture files. `audit` walks everything else and lists in `audit.csv` what might be hiding:
+
+- **disc images** (.iso);
+- **DVD rips** (VIDEO_TS folders) and **Blu-ray rips** (BDMV folders). Convert these to a single .mkv with MakeMKV so Plex sees one movie, not dozens of pieces;
+- **big .rar/.zip/.7z archives** that may hold a movie or album;
+- **unfinished downloads**;
+- **big files with a missing or wrong extension** that are really video or audio;
+- **audiobooks** (.m4b);
+- **media inside folders the scan skips** (hidden folders, AppData, Program Files);
+- **"personal" videos over an hour long**, in case a movie was mistaken for one of yours;
+- **videos not yet matched** to a movie or show.
+
+It changes nothing.
+
 ## 4. Identify everything
 
 ```powershell
@@ -115,6 +135,26 @@ Live versions, remixes, and the same song on a different album (a "Greatest Hits
 Songs with no artist/album tags come up as `review`. The easiest fix is to tag them with **MusicBrainz Picard** (free), then rescan that folder. Picard tags whole albums automatically from the audio. Otherwise leave them where they are.
 
 Then, as with everything else, run `plexopt apply music.csv` to preview and add `--execute` to do it.
+
+## 6b-2. What are those unknown songs?
+
+```powershell
+$env:ACOUSTID_API_KEY = "..."   # optional, free: https://acoustid.org/new-application
+plexopt music-check
+```
+
+This examines every song with no artist or album and labels it in `music-check.csv` as one of:
+
+- **song**: real music;
+- **long mix/album**: a DJ mix, a concert, or a whole album in one file;
+- **audiobook/podcast**;
+- **recording**: likely your own;
+- **sound effect**: game or app sounds, ringtones, samples;
+- **damaged**.
+
+It also lists the folders with the most unknowns.
+
+With an AcoustID key and **fpcalc** installed (from https://acoustid.org/chromaprint), it also listens to each likely song and names the real artist, title and album, even when the filename is junk. To write proper tags into the real songs, open them in **MusicBrainz Picard**. It uses the same fingerprinting. Then rescan and re-run `plexopt music`.
 
 ## 6c. Organize photos and remove duplicate pictures
 

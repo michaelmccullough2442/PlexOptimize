@@ -161,6 +161,7 @@ def _audio_info(audio, tags):
 
     return {
         "codec": a.get("codec_name"),
+        "channels": a.get("channels"),
         "bitrate": int(a["bit_rate"]) if str(a.get("bit_rate", "")).isdigit() else None,
         "sample_rate": int(a["sample_rate"]) if str(a.get("sample_rate", "")).isdigit() else None,
         "bits": a.get("bits_per_raw_sample") or a.get("bits_per_sample"),
