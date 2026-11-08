@@ -51,7 +51,8 @@ Read **[docs/REBUILD_GUIDE.md](docs/REBUILD_GUIDE.md)** for the full walkthrough
 | `dupes [--min-size MB]` | write `dupes.csv` of identical copies |
 | `music --music DIR [--keep best\|smallest]` | one copy of every song, consolidated into one folder -> `music.csv` |
 | `photos --photos DIR [--no-videos]` | photos + phone videos into `YYYY/YYYY-MM` folders, duplicate pictures removed -> `photos.csv` |
-| `apply CSV [--execute] [--mode move\|copy\|hardlink]` | carry out a plan |
+| `collect BACKUPS... --dest DRIVE` | copy new Steam/PC games, audiobooks, ebooks, PDFs from backup drives, skipping what the drive already has -> `collect.csv` |
+| `apply CSV [--execute] [--mode move\|copy\|hardlink] [--skip-deletes] [--only-from DRIVES]` | carry out a plan |
 | `undo` | reverse all applied changes |
 | `purge DRIVES... [--execute]` | permanently empty `_PlexOptimize\ToDelete` |
 | `plex-check` / `plex-setup` / `plex-remote` / `plex-refresh` | manage the Plex server |

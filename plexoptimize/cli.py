@@ -65,12 +65,21 @@ def main(argv=None):
                    help="free key from acoustid.org/new-application; identifies songs by their sound")
     s.add_argument("-o", "--out", default="music-check.csv")
 
+    s = sub.add_parser("collect", help="copy new games, audiobooks, ebooks and PDFs from backup drives -> collect.csv")
+    s.add_argument("sources", nargs="+", help=r"backup drives to copy FROM, e.g. E:\ F:\")
+    s.add_argument("--dest", required=True, help=r"drive to collect everything on, e.g. G:\")
+    s.add_argument("-o", "--out", default="collect.csv")
+
     s = sub.add_parser("report", help="list broken, personal and unidentified files")
 
     s = sub.add_parser("apply", help="carry out a plan/dupes CSV (dry run unless --execute)")
     s.add_argument("csv")
     s.add_argument("--execute", action="store_true")
     s.add_argument("--mode", choices=["move", "copy", "hardlink"], default="move")
+    s.add_argument("--skip-deletes", action="store_true",
+                   help="only add/organize; ignore delete and quarantine rows (use when importing from backups)")
+    s.add_argument("--only-from", nargs="*", default=[], metavar="DRIVE",
+                   help="only act on files coming from these drives/folders, e.g. your backup drives")
 
     sub.add_parser("undo", help="reverse everything done by apply --execute")
 
@@ -169,11 +178,19 @@ def main(argv=None):
         from . import music_check
         music_check.run(inv, a.acoustid_key, a.out)
 
+    elif a.cmd == "collect":
+        from . import collect
+        rows, media = collect.build([str(Path(s).resolve()) for s in a.sources], str(Path(a.dest).resolve()))
+        collect.write(rows, a.out)
+        print(f"Wrote {a.out}\n{collect.summary(rows, media, a.dest)}")
+        print("\nCheck it in Excel (set 'review' rows to copy or skip), then: plexopt apply", a.out,
+              "(dry run) and add --execute.")
+
     elif a.cmd == "report":
         _report(inv, full=True)
 
     elif a.cmd == "apply":
-        apply.run(planner.read_csv(a.csv), a.execute, a.mode)
+        apply.run(planner.read_csv(a.csv), a.execute, a.mode, skip_deletes=a.skip_deletes, only_from=a.only_from)
 
     elif a.cmd == "undo":
         apply.undo()

@@ -249,6 +249,58 @@ plexopt plex-check
 
 Once `plex-check` says `Remote access is WORKING`, you're done. Test it from your phone over mobile data with Wi-Fi off.
 
+## 9b. Importing from old backup drives
+
+Plug in the backup drives and the big drive you're collecting on. In this example the backups are `E:` and `F:` and the big drive is `G:`. **Backups are only copied from, never changed.**
+
+**Games, audiobooks, ebooks and PDFs:**
+
+```powershell
+plexopt collect E:\ F:\ --dest G:\
+```
+
+This writes `collect.csv` and prints how many new items and GB per type, how many it skipped as duplicates, and whether `G:` has room. Where things go on `G:`:
+
+| what | goes to |
+|---|---|
+| Steam games (found by their Steam manifest) | `G:\SteamLibrary\steamapps\common\<game>` |
+| GOG installers, repacks, anything in a Games / PC Games / GOG folder | `G:\Games\PC\<game>` |
+| Audiobooks (.m4b, or an "Audiobooks" folder, one folder per book) | `G:\Audiobooks\<book>` |
+| Ebooks and comics | `G:\Books\...` |
+| PDFs | `G:\PDFs\<backup>\...` (folders kept as they were) |
+| Disc images (.iso) | marked **review**: an .iso can be a game, a movie or software. Change the row to `copy` to keep it. |
+
+It skips:
+
+- anything `G:` already has: an identical file, the same Steam app id, or a same-named game folder within 2% of the size;
+- repeats across the backups. The more complete copy wins.
+
+Run it again any time; already-copied items show as duplicates.
+
+```powershell
+plexopt apply collect.csv            # dry run
+plexopt apply collect.csv --execute  # copies (game folders are size-checked after copying)
+```
+
+Afterwards:
+
+- **Steam:** go to **Settings > Storage**, add the `G:\SteamLibrary` drive, then install each game. Steam finds the files and only verifies them, with no re-download.
+- **Audiobooks in Plex:** make a Music-type library named *Audiobooks* pointing at `G:\Audiobooks`. Or use Audiobookshelf, which is built for audiobooks.
+- **Other PC games:** GOG and repack installers need to be run to install. Some games just run from their folder.
+
+**Movies, TV and music from the backups** go through the normal pipeline. That way they're identified, renamed for Plex and compared with what you already have by title and quality, not just by identical file. Use a separate inventory so this run only looks at the backups plus the big drive:
+
+```powershell
+plexopt --db import.db scan E:\ F:\ G:\
+plexopt --db import.db identify
+plexopt --db import.db plan  --movies "G:\Media\Movies" --tv "G:\Media\TV Shows"
+plexopt --db import.db music --music "G:\Media\Music"
+plexopt --db import.db apply plan.csv  --mode copy --skip-deletes --only-from E:\ F:\ --execute
+plexopt --db import.db apply music.csv --mode copy --skip-deletes --only-from E:\ F:\ --execute
+```
+
+`--only-from` makes it copy only things coming from the backups, so files already on `G:` are left exactly where they are. `--skip-deletes` ignores the "delete the lower-quality copy" rows. Where a backup has a *better* copy of a movie you already have, both versions end up on `G:`. Run a normal `plan` later if you want to remove the lesser one. Point your Plex libraries at the `G:\Media\...` folders, then run `plexopt plex-refresh`.
+
 ## 10. Keeping it clean
 
 When you add new downloads, run the same pipeline on just that folder:

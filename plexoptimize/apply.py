@@ -7,15 +7,24 @@ from pathlib import Path
 
 from .planner import drive_root, staging
 
-ACTIONS = {"move", "quarantine", "delete"}
+ACTIONS = {"move", "copy", "quarantine", "delete"}
 
 
 def _transfer(src, dst, mode):
     dst.parent.mkdir(parents=True, exist_ok=True)
     if mode == "hardlink":
         os.link(src, dst)
+    elif mode == "copy" and src.is_dir():
+        shutil.copytree(src, dst)  # whole game folders etc.
+        want = sum(f.stat().st_size for f in src.rglob("*") if f.is_file())
+        got = sum(f.stat().st_size for f in dst.rglob("*") if f.is_file())
+        if want != got:
+            raise OSError(f"folder copy incomplete ({got} of {want} bytes); remove {dst} and retry")
     elif mode == "copy":
         shutil.copy2(src, dst)
+        if dst.stat().st_size != src.stat().st_size:
+            dst.unlink()
+            raise OSError("size mismatch after copy")
     else:
         try:
             os.rename(src, dst)  # same drive: instant
@@ -27,13 +36,17 @@ def _transfer(src, dst, mode):
             src.unlink()
 
 
-def run(rows, execute=False, mode="move", journal="plexoptimize-journal.jsonl", log=print):
+def run(rows, execute=False, mode="move", journal="plexoptimize-journal.jsonl", log=print, skip_deletes=False,
+        only_from=()):
+    only_from = [str(Path(p).resolve()).lower() for p in only_from]
     done = skipped = failed = 0
     jf = open(journal, "a", encoding="utf-8") if execute else None
     try:
         for r in rows:
             action = (r.get("action") or "").strip().lower()
-            if action not in ACTIONS:
+            if action not in ACTIONS or (skip_deletes and action in ("delete", "quarantine")):
+                continue
+            if only_from and not any(r["source"].lower().startswith(p) for p in only_from):
                 continue
             src = Path(r["source"])
             dst = Path(r["destination"]) if r.get("destination") else None
@@ -42,7 +55,7 @@ def run(rows, execute=False, mode="move", journal="plexoptimize-journal.jsonl", 
                     continue
                 dst = staging(src, "Broken" if action == "quarantine" else "ToDelete")
             # Duplicate deletes always go to staging; library moves honour --mode.
-            how = mode if action == "move" else "move"
+            how = "copy" if action == "copy" else (mode if action == "move" else "move")
             if not src.exists():
                 skipped += 1
                 log(f"  gone     {src}")
@@ -61,7 +74,8 @@ def run(rows, execute=False, mode="move", journal="plexoptimize-journal.jsonl", 
                                      "src": str(src), "dst": str(dst)}) + "\n")
                 jf.flush()
                 done += 1
-                _prune_empty(src.parent)
+                if how == "move":
+                    _prune_empty(src.parent)
             except OSError as e:
                 failed += 1
                 log(f"  FAILED   {src}: {e}")
@@ -98,7 +112,7 @@ def undo(journal="plexoptimize-journal.jsonl", log=print):
             shutil.move(str(dst), str(src))
             log(f"  restored {src}")
         elif e["mode"] in ("copy", "hardlink") and dst.exists():
-            dst.unlink()
+            shutil.rmtree(dst) if dst.is_dir() else dst.unlink()
             log(f"  removed  {dst}")
     Path(journal).rename(f"{journal}.undone-{int(time.time())}")
 
