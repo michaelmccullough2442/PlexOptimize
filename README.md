@@ -37,6 +37,8 @@ plexopt plex-check
 
 Read **[docs/REBUILD_GUIDE.md](docs/REBUILD_GUIDE.md)** for the full walkthrough. It covers retiring the old server, settings, remote access troubleshooting and ongoing upkeep.
 
+For remote access over Tailscale (Plex on the I: drive, Sunshine/Moonlight, RetroArch, ROM share), use the PowerShell scripts in **[scripts/windows/](scripts/windows/README.md)** and the road troubleshooting list in **[docs/TIJUANA_CHECKLIST.md](docs/TIJUANA_CHECKLIST.md)**.
+
 ## Commands
 
 | command | what it does |
